@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cic-green: #7AB648;
+  --cic-dark-green: #5A8F38;
+  --cic-dark: #1A1A1A;
+  --cic-dark-card: #222222;
+  --cic-dark-surface: #2A2A2A;
+  --cic-muted: #888888;
+  --background: #111111;
+  --foreground: #F5F5F5;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-cic-green: var(--cic-green);
+  --color-cic-dark-green: var(--cic-dark-green);
+  --color-cic-dark: var(--cic-dark);
+  --color-cic-card: var(--cic-dark-card);
+  --color-cic-surface: var(--cic-dark-surface);
+  --color-cic-muted: var(--cic-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Recharts tooltip styling */
+.recharts-default-tooltip {
+  background: #222 !important;
+  border: 1px solid #7AB648 !important;
+  border-radius: 8px !important;
+}
+
+.recharts-tooltip-label {
+  color: #7AB648 !important;
+  font-weight: 600 !important;
 }
