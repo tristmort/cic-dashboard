@@ -122,11 +122,84 @@ function MetricCard({
   );
 }
 
+function NumberInput({
+  label,
+  value,
+  onChange,
+  prefix,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  prefix?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs text-[#888] font-medium mb-2">{label}</label>
+      <div className="relative">
+        {prefix && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888] text-sm font-medium">{prefix}</span>
+        )}
+        <input
+          type="number"
+          min={0}
+          value={value || ""}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          placeholder="0"
+          className={`w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl py-3 text-white text-2xl font-bold text-center focus:outline-none focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/50 transition-colors ${prefix ? "pl-8" : ""}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ResultMetric({
+  label,
+  value,
+  description,
+  color,
+}: {
+  label: string;
+  value: string;
+  description: string;
+  color?: "green" | "white" | "amber";
+}) {
+  const colorClass = color === "green" ? "text-[#7AB648]" : color === "amber" ? "text-[#F59E0B]" : "text-white";
+  return (
+    <div className="bg-[#1A1A1A] rounded-xl p-4 border border-[#2A2A2A]/50">
+      <p className="text-xs text-[#888] font-medium mb-1">{label}</p>
+      <p className={`text-2xl font-bold tracking-tight ${colorClass}`}>{value}</p>
+      <p className="text-xs text-[#666] mt-1">{description}</p>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [appointments, setAppointments] = useState(0);
+  const [closed, setClosed] = useState(0);
+  const [avgDealValue, setAvgDealValue] = useState(0);
+
+  // Load saved values from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("cic-dashboard-inputs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setAppointments(parsed.appointments || 0);
+        setClosed(parsed.closed || 0);
+        setAvgDealValue(parsed.avgDealValue || 0);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Save values to localStorage on change
+  useEffect(() => {
+    localStorage.setItem("cic-dashboard-inputs", JSON.stringify({ appointments, closed, avgDealValue }));
+  }, [appointments, closed, avgDealValue]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -237,6 +310,69 @@ export default function Dashboard() {
           <MetricCard label="Total Spend" value={formatCurrency(summary.spend)} sub="Last 30 days" />
           <MetricCard label="Impressions" value={formatNumber(summary.impressions)} sub={`${formatNumber(summary.reach)} reach`} />
           <MetricCard label="Click-Through Rate" value={`${summary.ctr.toFixed(2)}%`} sub={`${formatNumber(summary.clicks)} clicks`} />
+        </section>
+
+        {/* Business Metrics — Manual Inputs + Calculations */}
+        <section className="bg-[#222] rounded-2xl p-6 border border-[#2A2A2A]">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-1">Business Results</h2>
+              <p className="text-sm text-[#888]">Enter your real-world numbers to see the full picture</p>
+            </div>
+          </div>
+
+          {/* Input boxes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <NumberInput label="Appointments Booked" value={appointments} onChange={setAppointments} />
+            <NumberInput label="Deals Closed" value={closed} onChange={setClosed} />
+            <NumberInput label="Avg. Deal Value" value={avgDealValue} onChange={setAvgDealValue} prefix="R" />
+          </div>
+
+          {/* Calculated metrics */}
+          {(appointments > 0 || closed > 0) && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <ResultMetric
+                label="Booking Ratio"
+                value={summary.leads > 0 ? `${((appointments / summary.leads) * 100).toFixed(1)}%` : "—"}
+                description={summary.leads > 0 ? `${appointments} of ${summary.leads} leads booked` : "No leads yet"}
+                color="green"
+              />
+              <ResultMetric
+                label="Close Rate"
+                value={appointments > 0 ? `${((closed / appointments) * 100).toFixed(1)}%` : "—"}
+                description={appointments > 0 ? `${closed} of ${appointments} appointments closed` : "Enter appointments"}
+                color={appointments > 0 && (closed / appointments) >= 0.25 ? "green" : "amber"}
+              />
+              <ResultMetric
+                label="Lead-to-Sale"
+                value={summary.leads > 0 ? `${((closed / summary.leads) * 100).toFixed(1)}%` : "—"}
+                description={`${closed} sales from ${summary.leads} leads`}
+                color="white"
+              />
+              <ResultMetric
+                label="Cost per Booking"
+                value={appointments > 0 ? formatCurrency(summary.spend / appointments) : "—"}
+                description={appointments > 0 ? `Ad spend per appointment` : "Enter appointments"}
+                color="white"
+              />
+              <ResultMetric
+                label="Return on Ad Spend"
+                value={closed > 0 && avgDealValue > 0
+                  ? `${(((closed * avgDealValue - summary.spend) / summary.spend) * 100).toFixed(0)}%`
+                  : "—"}
+                description={closed > 0 && avgDealValue > 0
+                  ? `${formatCurrency(closed * avgDealValue)} revenue vs ${formatCurrency(summary.spend)} spend`
+                  : "Enter deals closed & avg deal value"}
+                color={closed > 0 && avgDealValue > 0 && (closed * avgDealValue) > summary.spend ? "green" : "amber"}
+              />
+            </div>
+          )}
+
+          {appointments === 0 && closed === 0 && (
+            <div className="text-center py-6 text-[#666]">
+              <p className="text-sm">Enter your appointments and closed deals above to see booking ratios, close rates, and ROI</p>
+            </div>
+          )}
         </section>
 
         {/* Daily Spend & Clicks Trend */}
