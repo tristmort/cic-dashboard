@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     await put(BLOB_KEY, JSON.stringify(metrics), {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: "application/json",
     });
 
