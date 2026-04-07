@@ -58,6 +58,12 @@ interface DashboardData {
   adSets: AdSetData[];
 }
 
+interface BusinessMetrics {
+  appointments: number;
+  closed: number;
+  avgDealValue: number;
+}
+
 const COLORS = {
   green: "#7AB648",
   darkGreen: "#5A8F38",
@@ -123,37 +129,6 @@ function MetricCard({
   );
 }
 
-function NumberInput({
-  label,
-  value,
-  onChange,
-  prefix,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  prefix?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-[#888] font-medium mb-2">{label}</label>
-      <div className="relative">
-        {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888] text-sm font-medium">{prefix}</span>
-        )}
-        <input
-          type="number"
-          min={0}
-          value={value || ""}
-          onChange={(e) => onChange(Number(e.target.value) || 0)}
-          placeholder="0"
-          className={`w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl py-3 text-white text-2xl font-bold text-center focus:outline-none focus:border-[#7AB648] focus:ring-1 focus:ring-[#7AB648]/50 transition-colors ${prefix ? "pl-8" : ""}`}
-        />
-      </div>
-    </div>
-  );
-}
-
 function ResultMetric({
   label,
   value,
@@ -175,70 +150,33 @@ function ResultMetric({
   );
 }
 
-export default function Dashboard() {
+export default function ViewDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [metrics, setMetrics] = useState<BusinessMetrics>({ appointments: 0, closed: 0, avgDealValue: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [appointments, setAppointments] = useState(0);
-  const [closed, setClosed] = useState(0);
-  const [avgDealValue, setAvgDealValue] = useState(0);
-
-  const [saving, setSaving] = useState(false);
-
-  // Load saved values from API (with localStorage fallback)
-  useEffect(() => {
-    async function loadMetrics() {
-      try {
-        const res = await fetch("/api/business-metrics");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.appointments || data.closed || data.avgDealValue) {
-            setAppointments(data.appointments || 0);
-            setClosed(data.closed || 0);
-            setAvgDealValue(data.avgDealValue || 0);
-            return;
-          }
-        }
-      } catch { /* fall through to localStorage */ }
-      try {
-        const saved = localStorage.getItem("cic-dashboard-inputs");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setAppointments(parsed.appointments || 0);
-          setClosed(parsed.closed || 0);
-          setAvgDealValue(parsed.avgDealValue || 0);
-        }
-      } catch { /* ignore */ }
-    }
-    loadMetrics();
-  }, []);
-
-  // Save values to both API and localStorage on change
-  useEffect(() => {
-    localStorage.setItem("cic-dashboard-inputs", JSON.stringify({ appointments, closed, avgDealValue }));
-
-    const timeout = setTimeout(async () => {
-      setSaving(true);
-      try {
-        await fetch("/api/business-metrics", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ appointments, closed, avgDealValue }),
-        });
-      } catch { /* silent fail — localStorage is backup */ }
-      setSaving(false);
-    }, 500);
-    return () => clearTimeout(timeout);
-  }, [appointments, closed, avgDealValue]);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/meta-insights");
-      if (!res.ok) throw new Error("Failed to fetch data");
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setData(json);
+      const [adRes, metricsRes] = await Promise.all([
+        fetch("/api/meta-insights"),
+        fetch("/api/business-metrics"),
+      ]);
+      if (!adRes.ok) throw new Error("Failed to fetch ad data");
+      const adJson = await adRes.json();
+      if (adJson.error) throw new Error(adJson.error);
+      setData(adJson);
+
+      if (metricsRes.ok) {
+        const metricsJson = await metricsRes.json();
+        setMetrics({
+          appointments: metricsJson.appointments || 0,
+          closed: metricsJson.closed || 0,
+          avgDealValue: metricsJson.avgDealValue || 0,
+        });
+      }
+
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
@@ -283,6 +221,7 @@ export default function Dashboard() {
   }
 
   const { summary, daily, adSets } = data;
+  const { appointments, closed, avgDealValue } = metrics;
 
   const spendPieData = adSets
     .filter((a) => a.spend > 0)
@@ -321,21 +260,12 @@ export default function Dashboard() {
                 </p>
               )}
             </div>
-            <button
-              onClick={() => { setLoading(true); fetchData(); }}
-              className="p-2 rounded-lg bg-[#2A2A2A] hover:bg-[#7AB648]/20 text-[#888] hover:text-[#7AB648] transition-colors"
-              title="Refresh data"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Social Proof Hero — The numbers that sell */}
+        {/* Social Proof Hero */}
         {appointments > 0 && (
           <section className="relative overflow-hidden rounded-2xl border border-[#7AB648]/30 bg-gradient-to-br from-[#7AB648]/10 via-[#1A1A1A] to-[#222] p-8">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#7AB648]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -367,7 +297,7 @@ export default function Dashboard() {
                   <p className="text-4xl md:text-6xl font-black text-[#7AB648] tracking-tight">
                     {summary.leads > 0 ? `${((appointments / summary.leads) * 100).toFixed(0)}%` : "—"}
                   </p>
-                  <p className="text-sm text-[#888] mt-2">lead → appointment conversion</p>
+                  <p className="text-sm text-[#888] mt-2">lead to appointment conversion</p>
                 </div>
                 <div>
                   <p className="text-sm text-[#888] font-medium mb-2">Cost per Appointment</p>
@@ -471,20 +401,20 @@ export default function Dashboard() {
           {appointments > 0 && summary.leads > 0 && (
             <div className="mt-6 pt-4 border-t border-[#2A2A2A] flex flex-wrap gap-6 text-sm">
               <div>
-                <span className="text-[#888]">Click → Lead: </span>
+                <span className="text-[#888]">Click to Lead: </span>
                 <span className="text-white font-semibold">
                   {summary.linkClicks > 0 ? ((summary.leads / summary.linkClicks) * 100).toFixed(1) : "0"}%
                 </span>
               </div>
               <div>
-                <span className="text-[#888]">Lead → Appointment: </span>
+                <span className="text-[#888]">Lead to Appointment: </span>
                 <span className="text-[#7AB648] font-semibold">
                   {((appointments / summary.leads) * 100).toFixed(1)}%
                 </span>
               </div>
               {closed > 0 && (
                 <div>
-                  <span className="text-[#888]">Appointment → Close: </span>
+                  <span className="text-[#888]">Appointment to Close: </span>
                   <span className="text-[#7AB648] font-semibold">
                     {((closed / appointments) * 100).toFixed(1)}%
                   </span>
@@ -500,24 +430,13 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Business Metrics — Manual Inputs + Calculations */}
-        <section className="bg-[#222] rounded-2xl p-6 border border-[#2A2A2A]">
-          <div className="flex items-start justify-between mb-6">
-            <div>
+        {/* Business Results — Read Only (no inputs) */}
+        {(appointments > 0 || closed > 0) && (
+          <section className="bg-[#222] rounded-2xl p-6 border border-[#2A2A2A]">
+            <div className="mb-6">
               <h2 className="text-lg font-semibold text-white mb-1">Business Results</h2>
-              <p className="text-sm text-[#888]">Enter your real-world numbers to see the full picture {saving && <span className="text-[#7AB648] ml-2">Saving...</span>}</p>
+              <p className="text-sm text-[#888]">Real-world performance tied to ad spend</p>
             </div>
-          </div>
-
-          {/* Input boxes */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <NumberInput label="Appointments Booked" value={appointments} onChange={setAppointments} />
-            <NumberInput label="Deals Closed" value={closed} onChange={setClosed} />
-            <NumberInput label="Avg. Deal Value" value={avgDealValue} onChange={setAvgDealValue} prefix="R" />
-          </div>
-
-          {/* Calculated metrics */}
-          {(appointments > 0 || closed > 0) && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               <ResultMetric
                 label="Booking Ratio"
@@ -528,7 +447,7 @@ export default function Dashboard() {
               <ResultMetric
                 label="Close Rate"
                 value={appointments > 0 ? `${((closed / appointments) * 100).toFixed(1)}%` : "—"}
-                description={appointments > 0 ? `${closed} of ${appointments} appointments closed` : "Enter appointments"}
+                description={appointments > 0 ? `${closed} of ${appointments} appointments closed` : "—"}
                 color={appointments > 0 && (closed / appointments) >= 0.25 ? "green" : "amber"}
               />
               <ResultMetric
@@ -540,7 +459,7 @@ export default function Dashboard() {
               <ResultMetric
                 label="Cost per Booking"
                 value={appointments > 0 ? formatCurrency(summary.spend / appointments) : "—"}
-                description={appointments > 0 ? `Ad spend per appointment` : "Enter appointments"}
+                description={appointments > 0 ? `Ad spend per appointment` : "—"}
                 color="white"
               />
               <ResultMetric
@@ -550,19 +469,19 @@ export default function Dashboard() {
                   : "—"}
                 description={closed > 0 && avgDealValue > 0
                   ? `${formatCurrency(closed * avgDealValue)} revenue vs ${formatCurrency(summary.spend)} spend`
-                  : "Enter deals closed & avg deal value"}
+                  : "—"}
                 color={closed > 0 && avgDealValue > 0 && (closed * avgDealValue) > summary.spend ? "green" : "amber"}
               />
               <ResultMetric
                 label="Cost per Acquisition"
                 value={closed > 0 ? formatCurrency(summary.spend / closed) : "—"}
-                description={closed > 0 ? `Ad spend per paying customer` : "Enter deals closed"}
+                description={closed > 0 ? `Ad spend per paying customer` : "—"}
                 color="white"
               />
               <ResultMetric
                 label="Revenue Generated"
                 value={closed > 0 && avgDealValue > 0 ? formatCurrency(closed * avgDealValue) : "—"}
-                description={closed > 0 && avgDealValue > 0 ? `${closed} deals at ${formatCurrency(avgDealValue)} avg` : "Enter deals & avg value"}
+                description={closed > 0 && avgDealValue > 0 ? `${closed} deals at ${formatCurrency(avgDealValue)} avg` : "—"}
                 color="green"
               />
               <ResultMetric
@@ -572,18 +491,12 @@ export default function Dashboard() {
                   : "—"}
                 description={appointments > closed && avgDealValue > 0
                   ? `${appointments - closed} open appointments`
-                  : "Pending appointments x deal value"}
+                  : "—"}
                 color="amber"
               />
             </div>
-          )}
-
-          {appointments === 0 && closed === 0 && (
-            <div className="text-center py-6 text-[#666]">
-              <p className="text-sm">Enter your appointments and closed deals above to see booking ratios, close rates, and ROI</p>
-            </div>
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Daily Spend & Clicks Trend */}
         <section className="bg-[#222] rounded-2xl p-6 border border-[#2A2A2A]">
