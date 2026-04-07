@@ -215,7 +215,7 @@ export default function ViewDashboard() {
           <p className="text-red-400 text-lg font-semibold mb-2">Unable to load data</p>
           <p className="text-[#888] text-sm">{error}</p>
           <button
-            onClick={() => { setLoading(true); fetchData(); }}
+            onClick={() => { setLoading(true); fetchAdData(); fetchMetrics(); }}
             className="mt-4 px-4 py-2 bg-[#7AB648] text-[#1A1A1A] rounded-lg font-semibold hover:bg-[#5A8F38] transition-colors"
           >
             Retry
