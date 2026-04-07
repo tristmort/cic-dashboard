@@ -52,6 +52,12 @@ export async function GET() {
         (a: { action_type: string }) => a.action_type === "lead"
       )?.value || "0";
 
+    const linkClicks = parseInt(
+      acct.actions?.find(
+        (a: { action_type: string }) => a.action_type === "link_click"
+      )?.value || "0"
+    );
+
     // Build daily data for charts
     const daily = (dailyInsights.data || []).map(
       (d: {
@@ -106,6 +112,7 @@ export async function GET() {
       summary: {
         impressions: parseInt(acct.impressions || "0"),
         clicks: parseInt(acct.clicks || "0"),
+        linkClicks,
         spend: parseFloat(acct.spend || "0"),
         leads: parseInt(leads),
         costPerLead: parseFloat(costPerLead),

@@ -21,6 +21,7 @@ import {
 interface Summary {
   impressions: number;
   clicks: number;
+  linkClicks: number;
   spend: number;
   leads: number;
   costPerLead: number;
@@ -304,12 +305,169 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Social Proof Hero — The numbers that sell */}
+        {appointments > 0 && (
+          <section className="relative overflow-hidden rounded-2xl border border-[#7AB648]/30 bg-gradient-to-br from-[#7AB648]/10 via-[#1A1A1A] to-[#222] p-8">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#7AB648]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#7AB648] animate-pulse" />
+                  <h2 className="text-sm font-semibold text-[#7AB648] uppercase tracking-widest">Live Client Results</h2>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-[#888]">
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-[#7AB648]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    &lt; 60s response time
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-[#7AB648]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    24/7 AI follow-up
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                <div>
+                  <p className="text-sm text-[#888] font-medium mb-2">Appointments Booked</p>
+                  <p className="text-4xl md:text-6xl font-black text-white tracking-tight">{appointments}</p>
+                  <p className="text-sm text-[#888] mt-2">from {summary.leads} leads generated</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#888] font-medium mb-2">Booking Rate</p>
+                  <p className="text-4xl md:text-6xl font-black text-[#7AB648] tracking-tight">
+                    {summary.leads > 0 ? `${((appointments / summary.leads) * 100).toFixed(0)}%` : "—"}
+                  </p>
+                  <p className="text-sm text-[#888] mt-2">lead → appointment conversion</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#888] font-medium mb-2">Cost per Appointment</p>
+                  <p className="text-4xl md:text-6xl font-black text-white tracking-tight">
+                    {formatCurrency(Math.round(summary.spend / appointments))}
+                  </p>
+                  <p className="text-sm text-[#888] mt-2">total ad spend per booking</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#888] font-medium mb-2">{closed > 0 ? "Jobs Closed" : "Cost per Lead"}</p>
+                  <p className="text-4xl md:text-6xl font-black text-white tracking-tight">
+                    {closed > 0 ? closed : formatCurrency(Math.round(summary.costPerLead))}
+                  </p>
+                  <p className="text-sm text-[#888] mt-2">
+                    {closed > 0 && appointments > 0
+                      ? `${((closed / appointments) * 100).toFixed(0)}% close rate`
+                      : "average across all leads"}
+                  </p>
+                </div>
+              </div>
+              {closed > 0 && avgDealValue > 0 && (
+                <div className="mt-8 pt-6 border-t border-[#7AB648]/20 grid grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-xs text-[#888] font-medium mb-1">Revenue Generated</p>
+                    <p className="text-2xl font-bold text-[#7AB648]">{formatCurrency(closed * avgDealValue)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#888] font-medium mb-1">Cost per Acquisition</p>
+                    <p className="text-2xl font-bold text-white">{formatCurrency(Math.round(summary.spend / closed))}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#888] font-medium mb-1">Return on Ad Spend</p>
+                    <p className="text-2xl font-bold text-[#7AB648]">
+                      {(((closed * avgDealValue) / summary.spend)).toFixed(1)}x
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* KPI Cards */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard label="Total Leads" value={formatNumber(summary.leads)} sub={`${formatCurrency(summary.costPerLead)} per lead`} accent />
           <MetricCard label="Total Spend" value={formatCurrency(summary.spend)} sub="Last 30 days" />
           <MetricCard label="Impressions" value={formatNumber(summary.impressions)} sub={`${formatNumber(summary.reach)} reach`} />
           <MetricCard label="Click-Through Rate" value={`${summary.ctr.toFixed(2)}%`} sub={`${formatNumber(summary.clicks)} clicks`} />
+        </section>
+
+        {/* Conversion Funnel */}
+        <section className="bg-[#222] rounded-2xl p-6 border border-[#2A2A2A]">
+          <h2 className="text-lg font-semibold text-white mb-1">Conversion Funnel</h2>
+          <p className="text-sm text-[#888] mb-6">Full pipeline from ad impression to closed deal</p>
+          <div className="space-y-3">
+            {(() => {
+              const steps = [
+                { label: "Impressions", value: summary.impressions },
+                { label: "Link Clicks", value: summary.linkClicks },
+                { label: "Leads", value: summary.leads },
+                ...(appointments > 0 ? [{ label: "Appointments", value: appointments }] : []),
+                ...(closed > 0 ? [{ label: "Closed Deals", value: closed }] : []),
+              ];
+              const maxVal = steps[0].value || 1;
+              return steps.map((step, i) => {
+                const width = Math.max((step.value / maxVal) * 100, 5);
+                const prevValue = i > 0 ? steps[i - 1].value : 0;
+                const convRate = i > 0 && prevValue > 0 ? ((step.value / prevValue) * 100).toFixed(1) : null;
+                const intensity = 0.15 + (i / Math.max(steps.length - 1, 1)) * 0.85;
+                return (
+                  <div key={step.label} className="flex items-center gap-3">
+                    <div className="w-28 shrink-0 text-right">
+                      <p className="text-sm text-[#888] font-medium">{step.label}</p>
+                    </div>
+                    <div className="w-14 shrink-0 text-right">
+                      {convRate ? (
+                        <span className="text-xs text-[#7AB648] font-semibold">{convRate}%</span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="h-10 rounded-lg flex items-center px-3"
+                        style={{
+                          width: `${width}%`,
+                          minWidth: "3rem",
+                          backgroundColor: `rgba(122, 182, 72, ${intensity})`,
+                        }}
+                      >
+                        <span className="text-white font-bold text-sm whitespace-nowrap">
+                          {formatNumber(step.value)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          {appointments > 0 && summary.leads > 0 && (
+            <div className="mt-6 pt-4 border-t border-[#2A2A2A] flex flex-wrap gap-6 text-sm">
+              <div>
+                <span className="text-[#888]">Click → Lead: </span>
+                <span className="text-white font-semibold">
+                  {summary.linkClicks > 0 ? ((summary.leads / summary.linkClicks) * 100).toFixed(1) : "0"}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[#888]">Lead → Appointment: </span>
+                <span className="text-[#7AB648] font-semibold">
+                  {((appointments / summary.leads) * 100).toFixed(1)}%
+                </span>
+              </div>
+              {closed > 0 && (
+                <div>
+                  <span className="text-[#888]">Appointment → Close: </span>
+                  <span className="text-[#7AB648] font-semibold">
+                    {((closed / appointments) * 100).toFixed(1)}%
+                  </span>
+                </div>
+              )}
+              <div>
+                <span className="text-[#888]">End-to-End: </span>
+                <span className="text-white font-semibold">
+                  {((appointments / summary.impressions) * 100).toFixed(3)}%
+                </span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Business Metrics — Manual Inputs + Calculations */}
@@ -330,7 +488,7 @@ export default function Dashboard() {
 
           {/* Calculated metrics */}
           {(appointments > 0 || closed > 0) && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               <ResultMetric
                 label="Booking Ratio"
                 value={summary.leads > 0 ? `${((appointments / summary.leads) * 100).toFixed(1)}%` : "—"}
@@ -364,6 +522,28 @@ export default function Dashboard() {
                   ? `${formatCurrency(closed * avgDealValue)} revenue vs ${formatCurrency(summary.spend)} spend`
                   : "Enter deals closed & avg deal value"}
                 color={closed > 0 && avgDealValue > 0 && (closed * avgDealValue) > summary.spend ? "green" : "amber"}
+              />
+              <ResultMetric
+                label="Cost per Acquisition"
+                value={closed > 0 ? formatCurrency(summary.spend / closed) : "—"}
+                description={closed > 0 ? `Ad spend per paying customer` : "Enter deals closed"}
+                color="white"
+              />
+              <ResultMetric
+                label="Revenue Generated"
+                value={closed > 0 && avgDealValue > 0 ? formatCurrency(closed * avgDealValue) : "—"}
+                description={closed > 0 && avgDealValue > 0 ? `${closed} deals at ${formatCurrency(avgDealValue)} avg` : "Enter deals & avg value"}
+                color="green"
+              />
+              <ResultMetric
+                label="Pipeline Value"
+                value={appointments > 0 && closed >= 0 && avgDealValue > 0
+                  ? formatCurrency((appointments - closed) * avgDealValue)
+                  : "—"}
+                description={appointments > closed && avgDealValue > 0
+                  ? `${appointments - closed} open appointments`
+                  : "Pending appointments x deal value"}
+                color="amber"
               />
             </div>
           )}
