@@ -157,26 +157,13 @@ export default function ViewDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchAdData = useCallback(async () => {
     try {
-      const [adRes, metricsRes] = await Promise.all([
-        fetch("/api/meta-insights"),
-        fetch("/api/business-metrics"),
-      ]);
-      if (!adRes.ok) throw new Error("Failed to fetch ad data");
-      const adJson = await adRes.json();
-      if (adJson.error) throw new Error(adJson.error);
-      setData(adJson);
-
-      if (metricsRes.ok) {
-        const metricsJson = await metricsRes.json();
-        setMetrics({
-          appointments: metricsJson.appointments || 0,
-          closed: metricsJson.closed || 0,
-          avgDealValue: metricsJson.avgDealValue || 0,
-        });
-      }
-
+      const res = await fetch("/api/meta-insights");
+      if (!res.ok) throw new Error("Failed to fetch ad data");
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setData(json);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
@@ -186,11 +173,29 @@ export default function ViewDashboard() {
     }
   }, []);
 
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/business-metrics");
+      if (res.ok) {
+        const json = await res.json();
+        setMetrics({
+          appointments: json.appointments || 0,
+          closed: json.closed || 0,
+          avgDealValue: json.avgDealValue || 0,
+        });
+      }
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 6 * 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    fetchAdData();
+    fetchMetrics();
+    // Ad data refreshes every 6 hours
+    const adInterval = setInterval(fetchAdData, 6 * 60 * 60 * 1000);
+    // Business metrics poll every 15 seconds so edits show up fast
+    const metricsInterval = setInterval(fetchMetrics, 15 * 1000);
+    return () => { clearInterval(adInterval); clearInterval(metricsInterval); };
+  }, [fetchAdData, fetchMetrics]);
 
   if (loading) {
     return (
