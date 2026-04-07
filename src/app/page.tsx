@@ -220,7 +220,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5 * 60 * 1000);
+    const interval = setInterval(fetchData, 6 * 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -685,7 +685,7 @@ export default function Dashboard() {
 
         {/* Footer */}
         <footer className="text-center py-6 text-xs text-[#888]">
-          <p>Powered by <span className="text-[#7AB648] font-semibold">Mort AI</span> — Data refreshes every 5 minutes</p>
+          <p>Powered by <span className="text-[#7AB648] font-semibold">Mort AI</span> — Data refreshes every 6 hours</p>
         </footer>
       </main>
     </div>
